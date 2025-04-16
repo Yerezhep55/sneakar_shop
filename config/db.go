@@ -1,26 +1,44 @@
 package config
 
 import (
+	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"log"
+	"os"
 	"sneaker_shop/models"
 )
 
-var DB *gorm.DB // 👈 эта переменная должна быть видимой и глобальной
+var DB *gorm.DB
 
-func ConnectDB() {
-	dsn := "host=localhost user=postgres password=Topi2005 dbname=sneakers_shop port=5432 sslmode=disable TimeZone=Asia/Almaty"
+// ConnectDatabase - подключение к базе данных
+func ConnectDatabase() error {
+	// Загружаем переменные окружения из .env файла
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("⚠️ .env файл не найден. Используется строка подключения по умолчанию")
+	}
+
+	// Получаем строку подключения
+	dsn := os.Getenv("DB_URI")
+	if dsn == "" {
+		// fallback — если .env нет, использовать хардкод
+		dsn = "host=localhost user=postgres password=Topi2005 dbname=sneakers_shop port=5432 sslmode=disable TimeZone=Asia/Almaty"
+	}
+
+	// Подключаемся к базе данных
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("❌ Не удалось подключиться к базе данных:", err)
+		return err
 	}
 
-	err = db.AutoMigrate(&models.Sneaker{})
+	// Миграция моделей
+	err = db.AutoMigrate(&models.Sneaker{}, &models.User{})
 	if err != nil {
-		log.Fatal("❌ Миграция не удалась:", err)
+		return err
 	}
 
-	DB = db // 👈 эта строка обязательно должна быть
+	DB = db
 	log.Println("✅ Успешно подключено к базе данных!")
+	return nil
 }

@@ -5,11 +5,39 @@ import (
 	"net/http"
 	"sneaker_shop/config"
 	"sneaker_shop/models"
+	"strconv"
 )
 
 func GetSneakers(c *gin.Context) {
 	var sneakers []models.Sneaker
-	config.DB.Find(&sneakers)
+
+	limit := c.DefaultQuery("limit", "10")
+	page := c.DefaultQuery("page", "1")
+	limitInt, _ := strconv.Atoi(limit)
+	pageInt, _ := strconv.Atoi(page)
+	offset := (pageInt - 1) * limitInt
+
+	model := c.DefaultQuery("models", "")
+	brand := c.DefaultQuery("brand", "")
+	price := c.DefaultQuery("price", "")
+
+	query := config.DB.Model(&models.Sneaker{})
+
+	if model != "" {
+		query = query.Where("models = ?", model)
+	}
+	if brand != "" {
+		query = query.Where("brand = ?", brand)
+	}
+	if price != "" {
+		priceFloat, err := strconv.ParseFloat(price, 64)
+		if err == nil {
+			query = query.Where("price = ?", priceFloat)
+		}
+	}
+
+	query.Limit(limitInt).Offset(offset).Find(&sneakers)
+
 	c.JSON(http.StatusOK, sneakers)
 }
 
@@ -23,7 +51,6 @@ func GetSneakerByID(c *gin.Context) {
 	c.JSON(http.StatusOK, sneaker)
 }
 
-// Создать новую пару
 func CreateSneaker(c *gin.Context) {
 	var sneaker models.Sneaker
 	if err := c.ShouldBindJSON(&sneaker); err != nil {
@@ -34,7 +61,6 @@ func CreateSneaker(c *gin.Context) {
 	c.JSON(http.StatusCreated, sneaker)
 }
 
-// Обновить кроссовки по ID
 func UpdateSneaker(c *gin.Context) {
 	id := c.Param("id")
 	var sneaker models.Sneaker
@@ -58,7 +84,6 @@ func UpdateSneaker(c *gin.Context) {
 	c.JSON(http.StatusOK, sneaker)
 }
 
-// Удалить кроссовки по ID
 func DeleteSneaker(c *gin.Context) {
 	id := c.Param("id")
 	var sneaker models.Sneaker
@@ -68,4 +93,17 @@ func DeleteSneaker(c *gin.Context) {
 	}
 	config.DB.Delete(&sneaker)
 	c.JSON(http.StatusOK, gin.H{"message": "Кроссовки удалены"})
+}
+
+func GetBrands(c *gin.Context) {
+	var brands []string
+	config.DB.Model(&models.Sneaker{}).Distinct().Pluck("brand", &brands)
+	c.JSON(http.StatusOK, brands)
+}
+
+func GetModelsByBrand(c *gin.Context) {
+	brand := c.Param("brand")
+	var modelsList []string
+	config.DB.Model(&models.Sneaker{}).Where("brand = ?", brand).Distinct().Pluck("models", &modelsList)
+	c.JSON(http.StatusOK, modelsList)
 }
